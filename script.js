@@ -26,19 +26,10 @@ let notas = [], notaAtivaId = null, iconeAtual = 'map-pin';
 let unsubscribe = null, currentTool = 'move';
 let initialPinchDist = null, lastTouchX = 0, lastTouchY = 0;
 
-// Ferramenta Mobile
-window.setTool = (tool) => {
-    currentTool = tool;
+window.setTool = (t) => {
+    currentTool = t;
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tool-' + tool).classList.add('active');
-};
-
-// Firebase Sync
-window.mudarMapa = (id) => {
-    if(!MAPAS[id]) return;
-    mapaAtual = id; mapImg.src = MAPAS[id];
-    zoom = 1.0; offsetX = 0; offsetY = 0;
-    conectarFirebase();
+    document.getElementById('tool-'+t).classList.add('active');
 };
 
 function conectarFirebase() {
@@ -51,124 +42,57 @@ function conectarFirebase() {
 }
 conectarFirebase();
 
-// --- SISTEMA DE TOQUE REVISADO ---
-
-canvas.addEventListener('touchstart', (e) => {
-    // e.preventDefault(); // Remova o comentário se o navegador ainda tentar rolar
-    
+// TOQUE MOBILE REVISADO
+canvas.addEventListener('touchstart', e => {
     if (e.touches.length === 1) {
-        lastTouchX = e.touches[0].clientX;
-        lastTouchY = e.touches[0].clientY;
-        
-        // No Mobile, criamos/abrimos apenas se a ferramenta 'edit' estiver ativa
-        if (currentTool === 'edit') {
-            handleInteraction(lastTouchX, lastTouchY, true);
-        }
+        lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY;
+        if (currentTool === 'edit') handleInteraction(lastTouchX, lastTouchY);
     } else if (e.touches.length === 2) {
-        // Inicia o cálculo da pinça
-        initialPinchDist = Math.hypot(
-            e.touches[0].clientX - e.touches[1].clientX,
-            e.touches[0].clientY - e.touches[1].clientY
-        );
+        initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     }
-}, { passive: false }); // 'passive: false' é vital para o preventDefault funcionar
+}, { passive: false });
 
-canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault(); // Impede o "puxar para atualizar" do Chrome
-    
+canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
     if (e.touches.length === 1 && currentTool === 'move') {
-        const touch = e.touches[0];
-        const dx = touch.clientX - lastTouchX;
-        const dy = touch.clientY - lastTouchY;
-        
-        offsetX += dx;
-        offsetY += dy;
-        
-        lastTouchX = touch.clientX;
-        lastTouchY = touch.clientY;
+        offsetX += e.touches[0].clientX - lastTouchX;
+        offsetY += e.touches[0].clientY - lastTouchY;
+        lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY;
         render();
     } else if (e.touches.length === 2) {
-        const dist = Math.hypot(
-            e.touches[0].clientX - e.touches[1].clientX,
-            e.touches[0].clientY - e.touches[1].clientY
-        );
-        
-        // Ponto central entre os dois dedos para o zoom focar ali
-        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
         const factor = dist / initialPinchDist;
-        
-        // Evita saltos bruscos no zoom
         if (Math.abs(1 - factor) > 0.01) {
-            applyZoom(factor, midX, midY);
+            applyZoom(factor, (e.touches[0].clientX + e.touches[1].clientX)/2, (e.touches[0].clientY + e.touches[1].clientY)/2);
             initialPinchDist = dist;
         }
     }
 }, { passive: false });
 
-// Mouse Events (PC)
-canvas.oncontextmenu = (e) => e.preventDefault();
-canvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) {
-        let lx = e.clientX, ly = e.clientY;
-        const move = (m) => { offsetX += m.clientX - lx; offsetY += m.clientY - ly; lx = m.clientX; ly = m.clientY; render(); };
-        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
-        window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
-    } else if (e.button === 2) {
-        handleInteraction(e.clientX, e.clientY, false);
-    }
-});
-
-function handleInteraction(clientX, clientY, isMobileTouch) {
-    const wx = (clientX - offsetX) / zoom;
-    const wy = (clientY - offsetY) / zoom;
+function handleInteraction(cx, cy) {
+    const wx = (cx - offsetX) / zoom;
+    const wy = (cy - offsetY) / zoom;
     const hit = notas.find(n => Math.hypot(n.x - wx, n.y - wy) < 25/zoom);
     if (hit) window.abrirNota(hit.id);
-    else if (!hit && (isMobileTouch || !isMobileTouch)) { 
-        const nova = { x: wx, y: wy, nome: 'Nova Nota', texto: '', cor: '#3b82f6', icone: iconeAtual, cat: 'Cidade', mapaId: mapaAtual };
+    else if (currentTool === 'edit') {
+        const nova = { x: wx, y: wy, nome: 'Nova Nota', texto: '', cor: '#3b82f6', icone: 'map-pin', cat: 'Local', mapaId: mapaAtual };
         addDoc(notasCol, nova).then(docRef => window.abrirNota(docRef.id, true));
     }
 }
 
-function applyZoom(factor, centerX, centerY) {
-    const wx = (centerX - offsetX) / zoom;
-    const wy = (centerY - offsetY) / zoom;
-    zoom = Math.min(Math.max(0.1, zoom * factor), 8);
-    offsetX = centerX - wx * zoom;
-    offsetY = centerY - wy * zoom;
+function applyZoom(f, cx, cy) {
+    const wx = (cx - offsetX) / zoom;
+    const wy = (cy - offsetY) / zoom;
+    zoom = Math.min(Math.max(0.1, zoom * f), 8);
+    offsetX = cx - wx * zoom; offsetY = cy - wy * zoom;
     render();
 }
 
-canvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    applyZoom(e.deltaY > 0 ? 0.9 : 1.1, e.clientX, e.clientY);
-}, { passive: false });
-
-// Renderização e UI (Mantenha o resto como estava)
-const iconList = ['map-pin', 'castle', 'skull', 'swords', 'tent', 'anchor', 'flame', 'book', 'shield', 'gem'];
-const VectorIcons = {
-    'map-pin': (c, s) => { c.beginPath(); c.arc(0, -s*0.2, s*0.6, 0, Math.PI*2); c.moveTo(0, s); c.lineTo(-s*0.5, 0); c.lineTo(s*0.5, 0); c.fill(); },
-    'castle': (c, s) => { c.fillRect(-s*0.8, -s*0.8, s*1.6, s*1.6); c.clearRect(-s*0.2, -s*0.8, s*0.4, s*0.4); },
-    'skull': (c, s) => { c.beginPath(); c.arc(0, -s*0.2, s*0.7, 0, Math.PI, true); c.rect(-s*0.4, 0, s*0.8, s*0.6); c.fill(); },
-    'swords': (c, s) => { c.rotate(Math.PI/4); c.fillRect(-s, -1.5, s*2, 3); c.rotate(-Math.PI/2); c.fillRect(-s, -1.5, s*2, 3); },
-    'tent': (c, s) => { c.beginPath(); c.moveTo(0, -s); c.lineTo(s, s); c.lineTo(-s, s); c.fill(); },
-    'anchor': (c, s) => { c.lineWidth=2; c.beginPath(); c.arc(0,0,s*0.8,0,Math.PI); c.moveTo(0,-s); c.lineTo(0,s); c.stroke(); },
-    'flame': (c, s) => { c.beginPath(); c.moveTo(0, s); c.quadraticCurveTo(s,0,0,-s); c.quadraticCurveTo(-s,0,0,s); c.fill(); },
-    'book': (c, s) => { c.fillRect(-s*0.8, -s*0.6, s*1.6, s*1.2); c.strokeStyle="#000"; c.beginPath(); c.moveTo(0,-s*0.6); c.lineTo(0,s*0.6); c.stroke(); },
-    'shield': (c, s) => { c.beginPath(); c.moveTo(-s, -s); c.lineTo(s, -s); c.quadraticCurveTo(s, s, 0, s*1.2); c.quadraticCurveTo(-s, s, -s, -s); c.fill(); },
-    'gem': (c, s) => { c.beginPath(); c.moveTo(0,-s); c.lineTo(s,0); c.lineTo(0,s); c.lineTo(-s,0); c.fill(); }
-};
-
-window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('hidden');
-window.fecharNota = () => document.getElementById('modal-nota').classList.add('hidden');
-window.entrarModoEdicao = () => { document.getElementById('view-mode').classList.add('hidden'); document.getElementById('edit-mode').classList.remove('hidden'); };
-window.entrarModoLeitura = () => { document.getElementById('view-mode').classList.remove('hidden'); document.getElementById('edit-mode').classList.add('hidden'); };
-
+// RESTANTE DAS FUNÇÕES (CATEGORIAS E UI)
 window.abrirNota = (id, editar = false) => {
     notaAtivaId = id; const n = notas.find(nota => nota.id === id); if(!n) return;
     document.getElementById('view-title').innerText = n.nome;
-    document.getElementById('view-desc').innerText = n.texto || "...";
+    document.getElementById('view-desc').innerText = n.texto || "Sem descrição.";
     document.getElementById('view-category').innerText = n.cat;
     document.getElementById('view-icon-bg').style.backgroundColor = n.cor;
     document.getElementById('view-icon').setAttribute('data-lucide', n.icone);
@@ -190,30 +114,53 @@ window.salvarNota = async () => {
     window.fecharNota();
 };
 
-window.deletarNota = async () => { if(confirm("Excluir?")) { await deleteDoc(doc(db, "notas", notaAtivaId)); window.fecharNota(); } };
-
-window.renderIconSelector = () => {
-    const cont = document.getElementById('icon-selector'); cont.innerHTML = '';
-    iconList.forEach(i => {
-        const d = document.createElement('div'); d.className = `icon-item ${iconeAtual === i ? 'selected' : ''}`;
-        d.innerHTML = `<i data-lucide="${i}" style="width:16px"></i>`;
-        d.onclick = () => { iconeAtual = i; window.renderIconSelector(); lucide.createIcons(); };
-        cont.appendChild(d);
-    });
-    lucide.createIcons();
-};
-
 window.updateSidebarUI = () => {
     const list = document.getElementById('lista-notas');
     const search = document.getElementById('search-notes').value.toLowerCase();
     list.innerHTML = '';
     notas.filter(n => n.nome.toLowerCase().includes(search)).forEach(n => {
         const item = document.createElement('div'); item.className = 'side-item-custom';
-        item.innerHTML = `<div style="width:8px; height:8px; border-radius:50%; background:${n.cor}"></div><div class="side-item-text"><strong>${n.nome}</strong><small>${n.cat}</small></div>`;
-        item.onclick = () => { zoom = 1.5; offsetX = (canvas.width/2)-(n.x*zoom); offsetY = (canvas.height/2)-(n.y*zoom); window.abrirNota(n.id); render(); };
+        item.innerHTML = `<div class="icon-circle" style="background:${n.cor}; width:30px; height:30px"><i data-lucide="${n.icone}" style="width:14px"></i></div>
+                          <div class="side-item-text"><strong>${n.nome}</strong><small>${n.cat}</small></div>`;
+        item.onclick = () => { 
+            zoom = 1.5; offsetX = (canvas.width/2)-(n.x*zoom); offsetY = (canvas.height/2)-(n.y*zoom); 
+            window.abrirNota(n.id); window.toggleSidebar(); render(); 
+        };
         list.appendChild(item);
     });
     lucide.createIcons();
+};
+
+// Mantenha VectorIcons, render(), resize e wheel eventos do código anterior...
+// (Resumido aqui por espaço, mas use os mesmos do seu script atual)
+
+window.mudarMapa = (id) => { mapaAtual = id; mapImg.src = MAPAS[id]; zoom = 1.0; offsetX = 0; offsetY = 0; conectarFirebase(); };
+window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('hidden');
+window.fecharNota = () => document.getElementById('modal-nota').classList.add('hidden');
+window.entrarModoEdicao = () => { document.getElementById('view-mode').classList.add('hidden'); document.getElementById('edit-mode').classList.remove('hidden'); };
+window.entrarModoLeitura = () => { document.getElementById('view-mode').classList.remove('hidden'); document.getElementById('edit-mode').classList.add('hidden'); };
+window.renderIconSelector = () => {
+    const cont = document.getElementById('icon-selector'); cont.innerHTML = '';
+    ['map-pin', 'castle', 'skull', 'swords', 'tent', 'anchor', 'flame', 'book', 'shield', 'gem'].forEach(i => {
+        const d = document.createElement('div'); d.className = `icon-item ${iconeAtual === i ? 'selected' : ''}`;
+        d.innerHTML = `<i data-lucide="${i}" style="width:20px"></i>`;
+        d.onclick = () => { iconeAtual = i; window.renderIconSelector(); lucide.createIcons(); };
+        cont.appendChild(d);
+    });
+    lucide.createIcons();
+};
+
+const VectorIcons = {
+    'map-pin': (c, s) => { c.beginPath(); c.arc(0, -s*0.2, s*0.6, 0, Math.PI*2); c.moveTo(0, s); c.lineTo(-s*0.5, 0); c.lineTo(s*0.5, 0); c.fill(); },
+    'castle': (c, s) => { c.fillRect(-s*0.8, -s*0.8, s*1.6, s*1.6); c.clearRect(-s*0.2, -s*0.8, s*0.4, s*0.4); },
+    'skull': (c, s) => { c.beginPath(); c.arc(0, -s*0.2, s*0.7, 0, Math.PI, true); c.rect(-s*0.4, 0, s*0.8, s*0.6); c.fill(); },
+    'swords': (c, s) => { c.rotate(Math.PI/4); c.fillRect(-s, -1.5, s*2, 3); c.rotate(-Math.PI/2); c.fillRect(-s, -1.5, s*2, 3); },
+    'tent': (c, s) => { c.beginPath(); c.moveTo(0, -s); c.lineTo(s, s); c.lineTo(-s, s); c.fill(); },
+    'anchor': (c, s) => { c.lineWidth=2; c.beginPath(); c.arc(0,0,s*0.8,0,Math.PI); c.moveTo(0,-s); c.lineTo(0,s); c.stroke(); },
+    'flame': (c, s) => { c.beginPath(); c.moveTo(0, s); c.quadraticCurveTo(s,0,0,-s); c.quadraticCurveTo(-s,0,0,s); c.fill(); },
+    'book': (c, s) => { c.fillRect(-s*0.8, -s*0.6, s*1.6, s*1.2); c.strokeStyle="#000"; c.beginPath(); c.moveTo(0,-s*0.6); c.lineTo(0,s*0.6); c.stroke(); },
+    'shield': (c, s) => { c.beginPath(); c.moveTo(-s, -s); c.lineTo(s, -s); c.quadraticCurveTo(s, s, 0, s*1.2); c.quadraticCurveTo(-s, s, -s, -s); c.fill(); },
+    'gem': (c, s) => { c.beginPath(); c.moveTo(0,-s); c.lineTo(s,0); c.lineTo(0,s); c.lineTo(-s,0); c.fill(); }
 };
 
 function render() {
@@ -230,6 +177,8 @@ function render() {
     document.getElementById('zoom-display').innerText = Math.round(zoom * 100) + '%';
 }
 
+window.deletarNota = async () => { if(confirm("Excluir?")) { await deleteDoc(doc(db, "notas", notaAtivaId)); window.fecharNota(); } };
+canvas.addEventListener('wheel', e => { e.preventDefault(); applyZoom(e.deltaY > 0 ? 0.9 : 1.1, e.clientX, e.clientY); }, { passive: false });
 mapImg.onload = render;
 window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; render(); });
 canvas.width = window.innerWidth; canvas.height = window.innerHeight;
