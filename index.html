@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Supernova | Atlas</title>
+    <title>Supernova | Multimap Mobile</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -21,6 +21,12 @@
                 <input type="text" id="search-notes" placeholder="Procurar local..." oninput="window.updateSidebarUI()">
             </div>
             <div id="lista-notas" class="side-list"></div>
+            <div class="side-footer">
+                <div class="sync-badge">
+                    <div class="dot pulse"></div>
+                    <span>Sincronizado</span>
+                </div>
+            </div>
         </aside>
 
         <nav class="hud-top">
@@ -28,24 +34,30 @@
                 <button onclick="window.toggleSidebar()" class="btn-main"><i data-lucide="menu"></i></button>
                 <div class="map-selector-wrapper">
                     <select id="select-mapa" class="btn-main" onchange="window.mudarMapa(this.value)">
-                        <option value="mundo">🗺️ Mapa 1</option>
-                        <option value="caverna">🌑 Mapa 2</option>
-                        <option value="cidade">🏘️ Mapa 3</option>
+                        <option value="mundo">🗺️ Teste 1</option>
+                        <option value="caverna">🌑 Teste 2</option>
+                        <option value="cidade">🏘️ Teste 3</option>
                     </select>
                 </div>
             </div>
             <div class="map-info">
                 <span id="zoom-display">100%</span>
             </div>
+            <div class="controls-legend">
+                <span><kbd>LMB</kbd> Mover</span>
+                <span><kbd>RMB</kbd> Criar</span>
+            </div>
         </nav>
 
         <div id="mobile-tools" class="mobile-toolbar">
             <button id="tool-move" class="tool-btn active" onclick="window.setTool('move')">
-                <i data-lucide="move"></i><span>Mover</span>
+                <i data-lucide="move"></i>
+                <span>Mover</span>
             </button>
             <div class="tool-sep"></div>
             <button id="tool-edit" class="tool-btn" onclick="window.setTool('edit')">
-                <i data-lucide="plus-circle"></i><span>Anotar</span>
+                <i data-lucide="map-pin"></i>
+                <span>Notas</span>
             </button>
         </div>
     </div>
@@ -54,7 +66,7 @@
 
     <div id="modal-nota" class="modal-overlay hidden">
         <div class="modal-content">
-            <div class="drag-handle"></div> <div id="view-mode">
+            <div id="view-mode">
                 <div class="modal-header">
                     <div class="header-left">
                         <div id="view-icon-bg" class="icon-circle"><i id="view-icon" data-lucide="map-pin"></i></div>
@@ -64,37 +76,31 @@
                 </div>
                 <div class="modal-body">
                     <div id="view-category" class="cat-tag">Categoria</div>
-                    <div id="view-desc" class="scroll-area"></div>
+                    <p id="view-desc"></p>
                 </div>
                 <div class="modal-footer">
-                    <button onclick="window.entrarModoEdicao()" class="btn-primary">Editar</button>
+                    <button onclick="window.entrarModoEdicao()" class="btn-primary">Editar Nota</button>
                 </div>
             </div>
 
             <div id="edit-mode" class="hidden">
-                <div class="modal-header">
-                    <h3>Editar Nota</h3>
-                    <button onclick="window.entrarModoLeitura()" class="btn-circle"><i data-lucide="arrow-left"></i></button>
-                </div>
-                <div class="modal-body scroll-area">
+                <div class="modal-header"><h3>Editar Nota</h3></div>
+                <div class="modal-body">
                     <div class="input-group"><label>Título</label><input type="text" id="nota-nome"></div>
                     <div class="input-group">
                         <label>Categoria</label>
                         <select id="nota-cat">
-                            <option value="Local">📍 Local</option>
-                            <option value="Objeto">📦 Objeto</option>
+                            <option value="Cidade">🏰 Cidade</option>
+                            <option value="Masmorra">💀 Masmorra</option>
                             <option value="NPC">👤 NPC</option>
-                            <option value="Pista">🔍 Pista</option>
-                            <option value="Perigoso">⚠️ Perigoso</option>
-                            <option value="Investigar">💡 Investigar</option>
-                            <option value="Outro">📄 Outro</option>
+                            <option value="Importante">⭐ Importante</option>
                         </select>
                     </div>
-                    <div class="input-group"><label>Descrição</label><textarea id="nota-texto" rows="3"></textarea></div>
+                    <div class="input-group"><label>Descrição</label><textarea id="nota-texto" rows="4"></textarea></div>
                     <div class="input-group">
-                        <label>Ícone e Cor</label>
+                        <label>Símbolo e Cor</label>
                         <div class="icon-grid" id="icon-selector"></div>
-                        <input type="color" id="nota-cor" class="color-input">
+                        <input type="color" id="nota-cor" class="color-full">
                     </div>
                 </div>
                 <div class="modal-footer">
