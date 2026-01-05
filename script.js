@@ -51,31 +51,59 @@ function conectarFirebase() {
 }
 conectarFirebase();
 
-// Mobile Touch Events
+// --- SISTEMA DE TOQUE REVISADO ---
+
 canvas.addEventListener('touchstart', (e) => {
+    // e.preventDefault(); // Remova o comentário se o navegador ainda tentar rolar
+    
     if (e.touches.length === 1) {
         lastTouchX = e.touches[0].clientX;
         lastTouchY = e.touches[0].clientY;
-        if (currentTool === 'edit') handleInteraction(lastTouchX, lastTouchY, true);
+        
+        // No Mobile, criamos/abrimos apenas se a ferramenta 'edit' estiver ativa
+        if (currentTool === 'edit') {
+            handleInteraction(lastTouchX, lastTouchY, true);
+        }
     } else if (e.touches.length === 2) {
-        initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        // Inicia o cálculo da pinça
+        initialPinchDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
     }
-}, { passive: false });
+}, { passive: false }); // 'passive: false' é vital para o preventDefault funcionar
 
 canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Impede o "puxar para atualizar" do Chrome
+    
     if (e.touches.length === 1 && currentTool === 'move') {
-        offsetX += e.touches[0].clientX - lastTouchX;
-        offsetY += e.touches[0].clientY - lastTouchY;
-        lastTouchX = e.touches[0].clientX; lastTouchY = e.touches[0].clientY;
+        const touch = e.touches[0];
+        const dx = touch.clientX - lastTouchX;
+        const dy = touch.clientY - lastTouchY;
+        
+        offsetX += dx;
+        offsetY += dy;
+        
+        lastTouchX = touch.clientX;
+        lastTouchY = touch.clientY;
         render();
     } else if (e.touches.length === 2) {
-        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        
+        // Ponto central entre os dois dedos para o zoom focar ali
         const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        
         const factor = dist / initialPinchDist;
-        applyZoom(factor, midX, midY);
-        initialPinchDist = dist;
+        
+        // Evita saltos bruscos no zoom
+        if (Math.abs(1 - factor) > 0.01) {
+            applyZoom(factor, midX, midY);
+            initialPinchDist = dist;
+        }
     }
 }, { passive: false });
 
